@@ -1,48 +1,42 @@
-# Technosphere auto-update launcher
+# Technosphere root updater
 
-This wrapper keeps the game files in `app/` synced to:
+This folder now uses a single root `index.php` as the entry point.
 
-- repo: `stevenwilkins/Technosphere`
-- branch: `main`
+## What it does
 
-## Run
+- checks `stevenwilkins/Technosphere` on GitHub when the app entry is requested
+- skips the update when the latest commit SHA matches the last deployed SHA
+- downloads and mirrors the repo into `app/` only when the commit changed
+- preserves local save files:
+  - `app/technosphere.sqlite`
+  - `app/technosphere_fallback.json`
+- then serves the requested file from `app/` or falls back to `app/index.php`
+
+## Run locally
+
+From this folder:
 
 ```bash
-php start.php
+php -S localhost:8000 index.php
 ```
 
-That will:
-
-1. check the latest commit on GitHub
-2. download the repo archive only when the deployed commit differs
-3. update the files in `app/`
-4. preserve local save files:
-   - `app/technosphere.sqlite`
-   - `app/technosphere_fallback.json`
-5. start the PHP built-in server on `localhost:8000`
-
-Open:
+Then open:
 
 ```text
-http://localhost:8000/index.php
+http://localhost:8000/
 ```
 
-## Other usage
+The router form above is recommended because it lets the root `index.php` serve future files that may appear in the repo under `app/`.
 
-Update only, do not start the server:
+## Optional CLI update check
 
 ```bash
-php start.php --update-only
+php index.php update
 ```
 
-Use a different bind address:
+## Files
 
-```bash
-php start.php 127.0.0.1:9000
-```
-
-## Notes
-
-- This trusts the contents of the public GitHub repository on every run.
-- If GitHub is unreachable, it keeps serving the local copy already in `app/`.
-- `ZipArchive` is required to apply updates automatically.
+- `index.php` — root updater and request router
+- `app/` — synced copy of the GitHub repo
+- `.technosphere-updater.json` — last deployed commit metadata
+- `.technosphere-updater.lock` — update lock file

@@ -13,58 +13,222 @@ const PRESERVE_PATHS = [
     'technosphere_fallback.json',
 ];
 
-main($argv);
+if (PHP_SAPI === 'cli') {
+    handle_cli($argv ?? []);
+    exit;
+}
 
-function main(array $argv): void
+handle_web_request();
+
+function handle_cli(array $argv): void
 {
-    if (PHP_SAPI !== 'cli') {
-        http_response_code(403);
-        header('Content-Type: text/plain; charset=utf-8');
-        echo "Run this file from the command line: php start.php\n";
+    $command = $argv[1] ?? 'help';
+
+    if ($command === 'update') {
+        ensure_app_directory();
+        $status = run_update();
+        fwrite(STDOUT, $status['message'] . PHP_EOL);
         return;
     }
 
-    [$address, $updateOnly] = parse_cli_arguments($argv);
+    fwrite(STDOUT, "Technosphere root launcher\n");
+    fwrite(STDOUT, "Use one of these:\n");
+    fwrite(STDOUT, "  php -S localhost:8000 index.php\n");
+    fwrite(STDOUT, "  php index.php update\n");
+}
+
+function handle_web_request(): void
+{
+    $request = request_path();
+    $resolvedBeforeUpdate = resolve_app_path($request);
+
+    $needsUpdateCheck = ($resolvedBeforeUpdate === null) || pathinfo($resolvedBeforeUpdate, PATHINFO_EXTENSION) === 'php';
 
     ensure_app_directory();
 
-    $status = run_update();
+    $status = null;
+    if ($needsUpdateCheck) {
+        $status = run_update();
+        if (is_array($status) && isset($status['message'])) {
+            header('X-Technosphere-Update: ' . sanitize_header_value((string)$status['message']));
+        }
+    }
 
-    fwrite(STDOUT, $status['message'] . PHP_EOL);
+    $resolvedAfterUpdate = resolve_app_path($request);
 
-    if ($updateOnly) {
+    if ($resolvedAfterUpdate !== null) {
+        if (is_dir($resolvedAfterUpdate)) {
+            $candidate = rtrim($resolvedAfterUpdate, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'index.php';
+            if (is_file($candidate)) {
+                $resolvedAfterUpdate = $candidate;
+            }
+        }
+
+        if (is_file($resolvedAfterUpdate)) {
+            $extension = strtolower(pathinfo($resolvedAfterUpdate, PATHINFO_EXTENSION));
+            if ($extension === 'php') {
+                include_php_file($resolvedAfterUpdate);
+                return;
+            }
+
+            serve_static_file($resolvedAfterUpdate);
+            return;
+        }
+    }
+
+    $appIndex = APP_DIR . '/index.php';
+    if (!is_file($appIndex)) {
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "Technosphere app is unavailable.\n";
+        if (is_array($status) && isset($status['message'])) {
+            echo $status['message'] . "\n";
+        }
         return;
     }
 
-    $command = sprintf(
-        '%s -S %s -t %s',
-        escapeshellarg(PHP_BINARY),
-        escapeshellarg($address),
-        escapeshellarg(APP_DIR)
-    );
-
-    fwrite(STDOUT, 'Serving ' . APP_DIR . ' at http://' . $address . "/index.php\n");
-    passthru($command, $exitCode);
-    exit($exitCode);
+    include_php_file($appIndex);
 }
 
-function parse_cli_arguments(array $argv): array
+function request_path(): string
 {
-    $address = 'localhost:8000';
-    $updateOnly = false;
+    $uri = $_SERVER['REQUEST_URI'] ?? '/';
+    $path = parse_url($uri, PHP_URL_PATH);
+    return is_string($path) ? $path : '/';
+}
 
-    foreach (array_slice($argv, 1) as $arg) {
-        if ($arg === '--update-only') {
-            $updateOnly = true;
+function resolve_app_path(string $requestPath): ?string
+{
+    $parts = explode('/', rawurldecode($requestPath));
+    $safeParts = [];
+
+    foreach ($parts as $part) {
+        if ($part === '' || $part === '.') {
             continue;
         }
+        if ($part === '..') {
+            return null;
+        }
+        $safeParts[] = $part;
+    }
 
-        if (preg_match('/^[A-Za-z0-9.\-]+:\d+$/', $arg) === 1) {
-            $address = $arg;
+    if ($safeParts === []) {
+        return APP_DIR . '/index.php';
+    }
+
+    $fullPath = APP_DIR . '/' . implode('/', $safeParts);
+    $appRootReal = realpath(APP_DIR);
+    $existingReal = realpath($fullPath);
+
+    if ($existingReal !== false) {
+        if ($appRootReal === false) {
+            return null;
+        }
+        $prefix = rtrim($appRootReal, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        if ($existingReal !== $appRootReal && !str_starts_with($existingReal, $prefix)) {
+            return null;
+        }
+        return $existingReal;
+    }
+
+    $normalized = normalize_path($fullPath);
+    $appRootNormalized = normalize_path(APP_DIR);
+
+    $prefix = rtrim($appRootNormalized, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+    if ($normalized !== $appRootNormalized && !str_starts_with($normalized, $prefix)) {
+        return null;
+    }
+
+    return $normalized;
+}
+
+function normalize_path(string $path): string
+{
+    $path = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
+    $segments = explode(DIRECTORY_SEPARATOR, $path);
+    $result = [];
+
+    foreach ($segments as $segment) {
+        if ($segment === '' || $segment === '.') {
+            continue;
+        }
+        if ($segment === '..') {
+            array_pop($result);
+            continue;
+        }
+        $result[] = $segment;
+    }
+
+    if (preg_match('/^[A-Za-z]:$/', $segments[0] ?? '') === 1) {
+        return array_shift($segments) . DIRECTORY_SEPARATOR . implode(DIRECTORY_SEPARATOR, $result);
+    }
+
+    return DIRECTORY_SEPARATOR . implode(DIRECTORY_SEPARATOR, $result);
+}
+
+function include_php_file(string $path): void
+{
+    chdir(dirname($path));
+    require $path;
+}
+
+function serve_static_file(string $path): void
+{
+    if (!is_file($path)) {
+        http_response_code(404);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "Not found\n";
+        return;
+    }
+
+    $mime = guess_mime_type($path);
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . (string)filesize($path));
+    header('Cache-Control: public, max-age=300');
+    header('Last-Modified: ' . gmdate('D, d M Y H:i:s', filemtime($path) ?: time()) . ' GMT');
+    readfile($path);
+}
+
+function guess_mime_type(string $path): string
+{
+    $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+    $map = [
+        'css' => 'text/css; charset=utf-8',
+        'js' => 'application/javascript; charset=utf-8',
+        'json' => 'application/json; charset=utf-8',
+        'svg' => 'image/svg+xml',
+        'png' => 'image/png',
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        'woff' => 'font/woff',
+        'woff2' => 'font/woff2',
+        'ttf' => 'font/ttf',
+        'txt' => 'text/plain; charset=utf-8',
+        'html' => 'text/html; charset=utf-8',
+        'map' => 'application/json; charset=utf-8',
+        'ico' => 'image/x-icon',
+    ];
+
+    if (isset($map[$extension])) {
+        return $map[$extension];
+    }
+
+    if (function_exists('mime_content_type')) {
+        $detected = @mime_content_type($path);
+        if (is_string($detected) && $detected !== '') {
+            return $detected;
         }
     }
 
-    return [$address, $updateOnly];
+    return 'application/octet-stream';
+}
+
+function sanitize_header_value(string $value): string
+{
+    return trim(str_replace(["\r", "\n"], ' ', $value));
 }
 
 function ensure_app_directory(): void
@@ -424,7 +588,6 @@ function http_download(string $url, array $headers, string $targetPath): int
         'http' => [
             'method' => 'GET',
             'header' => implode("\r\n", $headers),
-            'follow_location' => 1,
             'ignore_errors' => true,
             'timeout' => 60,
         ],
