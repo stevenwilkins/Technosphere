@@ -1,0 +1,89 @@
+{
+    "creatures": {
+        "9159b5c575c8e017d6ff5c9244e1f4ff": {
+            "id": 0,
+            "browser_token": "9159b5c575c8e017d6ff5c9244e1f4ff",
+            "name": "Technosphere-01",
+            "age": 0,
+            "generation": 1,
+            "energy": 120,
+            "x": 0,
+            "z": 0,
+            "rotation": 0,
+            "evolution_points": 0,
+            "foods_eaten": 0,
+            "last_evolved_age": 0,
+            "genes": {
+                "size": 1,
+                "speed": 1.15,
+                "sense": 18,
+                "hue": 0.42,
+                "limbs": 4,
+                "crest": 0.3,
+                "agility": 0.72,
+                "metabolism": 1,
+                "bodyNoise": 0.15
+            },
+            "created_at": "2026-03-09T09:44:00+00:00",
+            "updated_at": "2026-03-09T09:44:00+00:00"
+        },
+        "98d750da493cd0b009fd256ba301025e": {
+            "id": 0,
+            "browser_token": "98d750da493cd0b009fd256ba301025e",
+            "name": "Technosphere-01",
+            "age": 0,
+            "generation": 1,
+            "energy": 120,
+            "x": 0,
+            "z": 0,
+            "rotation": 0,
+            "evolution_points": 0,
+            "foods_eaten": 0,
+            "last_evolved_age": 0,
+            "genes": {
+                "size": 1,
+                "speed": 1.15,
+                "sense": 18,
+                "hue": 0.42,
+                "limbs": 4,
+                "crest": 0.3,
+                "agility": 0.72,
+                "metabolism": 1,
+                "bodyNoise": 0.15
+            },
+            "created_at": "2026-03-09T09:54:28+00:00",
+            "updated_at": "2026-03-09T09:54:28+00:00"
+        },
+        "592a0bcb84102cf731142053430cc999": {
+            "id": 0,
+            "browser_token": "592a0bcb84102cf731142053430cc999",
+            "name": "Technosphere-01",
+            "age": 0,
+            "generation": 1,
+            "energy": 120,
+            "x": 0,
+            "z": 0,
+            "rotation": 0,
+            "evolution_points": 0,
+            "foods_eaten": 0,
+            "last_evolved_age": 0,
+            "genes": {
+                "size": 1,
+                "speed": 1.15,
+                "sense": 18,
+                "hue": 0.42,
+                "limbs": 4,
+                "crest": 0.3,
+                "agility": 0.72,
+                "metabolism": 1,
+                "bodyNoise": 0.15,
+                "bodyLength": 1.2,
+                "headSize": 1,
+                "legLength": 1.05,
+                "tailLength": 0.8
+            },
+            "created_at": "2026-03-09T10:24:52+00:00",
+            "updated_at": "2026-03-09T10:24:52+00:00"
+        }
+    }
+}
